@@ -102,6 +102,15 @@ function demarrer(){
 // Une seule session d'écoute continue. Le texte de la session est reconstruit à chaque
 // événement à partir de tous ses résultats (évite les doublons d'Android).
 let base='',relances=0;
+// Android renvoie des morceaux cumulés (« un », « un deux », « un deux trois ») :
+// un morceau qui reprend le texte déjà là le remplace au lieu de s'y ajouter.
+function fusion(a,b){
+  if(!a)return b;if(!b)return a;
+  const A=a.toLowerCase(),B=b.toLowerCase();
+  if(B.startsWith(A))return b;
+  if(A.endsWith(B)||A.startsWith(B))return a;
+  return a+' '+b;
+}
 function lancerRec(){
   if(rec){try{rec.onend=null;rec.abort()}catch(x){}}
   base=texteFinal;const debut=Date.now();
@@ -110,15 +119,16 @@ function lancerRec(){
     let fin='',prov='';
     for(let i=0;i<e.results.length;i++){
       const t=e.results[i][0].transcript.trim();
-      if(e.results[i].isFinal)fin+=(fin?' ':'')+t; else prov+=(prov?' ':'')+t;
+      if(e.results[i].isFinal)fin=fusion(fin,t); else prov=fusion(prov,t);
     }
+    if(fin&&prov.toLowerCase().startsWith(fin.toLowerCase()))prov=prov.slice(fin.length).trim();
     texteFinal=(base&&fin?base+' ':base)+fin;provisoire=prov;relances=0;
     if(MOT_ENVOI.test(texteFinal)){texteFinal=texteFinal.replace(MOT_ENVOI,'');provisoire='';arreter();envoyer();return}
     afficher();
   };
   rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){ecoute=false;majBouton();message('Micro refusé. Autorise le micro pour ce site.',true)}};
   rec.onend=()=>{
-    if(provisoire){texteFinal=(texteFinal?texteFinal+' ':'')+provisoire}
+    if(provisoire){texteFinal=fusion(texteFinal,provisoire)}
     provisoire='';afficher();
     // Chrome coupe l'écoute après un long silence : on relance, mais pas en boucle.
     if(ecoute&&Date.now()-debut>3000&&relances<3){relances++;lancerRec()}
@@ -127,7 +137,7 @@ function lancerRec(){
   try{rec.start()}catch(x){}
 }
 function arreter(){ecoute=false;if(rec){try{rec.onend=null;rec.stop()}catch(x){}}
-  if(provisoire){texteFinal=(texteFinal?texteFinal+' ':'')+provisoire;provisoire=''}
+  if(provisoire){texteFinal=fusion(texteFinal,provisoire);provisoire=''}
   afficher();majBouton()}
 $('micro').onclick=()=>{if(envoiEnCours)return;ecoute?arreter():demarrer()};
 $('effacer').onclick=()=>{texteFinal='';provisoire='';afficher();majBouton()};

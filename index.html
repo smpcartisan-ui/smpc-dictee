@@ -97,24 +97,38 @@ function majBouton(){
 function demarrer(){
   if(!SR){message('Reconnaissance vocale absente de ce navigateur (utilise Chrome).',true);return}
   speechSynthesis.cancel();
-  ecoute=true;majBouton();lancerRec();
+  ecoute=true;relances=0;majBouton();lancerRec();
 }
+// Une seule session d'écoute continue. Le texte de la session est reconstruit à chaque
+// événement à partir de tous ses résultats (évite les doublons d'Android).
+let base='',relances=0;
 function lancerRec(){
-  rec=new SR();rec.lang='fr-FR';rec.continuous=false;rec.interimResults=true;
+  if(rec){try{rec.onend=null;rec.abort()}catch(x){}}
+  base=texteFinal;const debut=Date.now();
+  rec=new SR();rec.lang='fr-FR';rec.continuous=true;rec.interimResults=true;
   rec.onresult=e=>{
-    provisoire='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
+    let fin='',prov='';
+    for(let i=0;i<e.results.length;i++){
       const t=e.results[i][0].transcript.trim();
-      if(e.results[i].isFinal)texteFinal=(texteFinal?texteFinal+' ':'')+t; else provisoire+=t;
+      if(e.results[i].isFinal)fin+=(fin?' ':'')+t; else prov+=(prov?' ':'')+t;
     }
+    texteFinal=(base&&fin?base+' ':base)+fin;provisoire=prov;relances=0;
     if(MOT_ENVOI.test(texteFinal)){texteFinal=texteFinal.replace(MOT_ENVOI,'');provisoire='';arreter();envoyer();return}
     afficher();
   };
   rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){ecoute=false;majBouton();message('Micro refusé. Autorise le micro pour ce site.',true)}};
-  rec.onend=()=>{provisoire='';afficher();if(ecoute)setTimeout(()=>{if(ecoute)try{lancerRec()}catch(x){}},150)};
+  rec.onend=()=>{
+    if(provisoire){texteFinal=(texteFinal?texteFinal+' ':'')+provisoire}
+    provisoire='';afficher();
+    // Chrome coupe l'écoute après un long silence : on relance, mais pas en boucle.
+    if(ecoute&&Date.now()-debut>3000&&relances<3){relances++;lancerRec()}
+    else if(ecoute){ecoute=false;majBouton()}
+  };
   try{rec.start()}catch(x){}
 }
-function arreter(){ecoute=false;try{rec&&rec.stop()}catch(x){}majBouton()}
+function arreter(){ecoute=false;if(rec){try{rec.onend=null;rec.stop()}catch(x){}}
+  if(provisoire){texteFinal=(texteFinal?texteFinal+' ':'')+provisoire;provisoire=''}
+  afficher();majBouton()}
 $('micro').onclick=()=>{if(envoiEnCours)return;ecoute?arreter():demarrer()};
 $('effacer').onclick=()=>{texteFinal='';provisoire='';afficher();majBouton()};
 $('envoyer').onclick=()=>{arreter();envoyer()};

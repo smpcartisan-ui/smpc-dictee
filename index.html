@@ -38,6 +38,7 @@
 <iframe id="webapp" title="Dispatch"></iframe>
 <header>
   <div id="dictee"></div>
+  <textarea id="clavier" rows="2" placeholder="Ou dicte avec le micro du clavier, puis Envoyer" style="display:none;width:100%;font:inherit;font-size:17px;padding:6px 8px;border:1px solid var(--bord);border-radius:10px;background:var(--fond);color:var(--texte);margin-bottom:4px"></textarea>
   <div id="reponse"></div>
   <div class="opts">
     <label><input type="checkbox" id="mainsLibres"> Mains libres</label>
@@ -48,6 +49,7 @@
   </div>
   <div class="ligne">
     <button id="micro">🎤 Parler</button>
+    <button id="modeClavier" class="petit" title="Dicter avec le clavier (sans bips)">⌨</button>
     <button id="effacer" class="petit" title="Effacer">⌫</button>
     <button id="envoyer" class="petit" disabled>Envoyer</button>
   </div>
@@ -126,7 +128,7 @@ function lancerRec(){
     if(MOT_ENVOI.test(texteFinal)){texteFinal=texteFinal.replace(MOT_ENVOI,'');provisoire='';arreter();envoyer();return}
     afficher();
   };
-  rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){ecoute=false;majBouton();message('Micro refusé. Autorise le micro pour ce site.',true)}};
+  rec.onerror=e=>{if(document.hidden){ecoute=false;majBouton();return}if(e.error==='not-allowed'||e.error==='service-not-allowed'){ecoute=false;majBouton();message('Micro refusé. Autorise le micro pour ce site.',true)}};
   rec.onend=()=>{
     if(provisoire){texteFinal=fusion(texteFinal,provisoire)}
     provisoire='';afficher();
@@ -136,11 +138,33 @@ function lancerRec(){
   };
   try{rec.start()}catch(x){}
 }
+/* ---- Écran allumé tant que la page est ouverte (sinon la veille coupe le micro) ---- */
+let verrouEcran=null;
+async function garderEcran(){
+  try{if('wakeLock' in navigator&&!verrouEcran&&!document.hidden){verrouEcran=await navigator.wakeLock.request('screen');verrouEcran.addEventListener('release',()=>{verrouEcran=null})}}catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){if(ecoute)arreter()}   // page masquée : on coupe proprement, sans message d'erreur
+  else garderEcran();
+});
+document.addEventListener('click',garderEcran,{once:false,passive:true});
+garderEcran();
+
+/* ---- Dictée au clavier (micro de Gboard : pas de bips, pas de coupures) ---- */
+let modeClavier=stock.get('smpc_clavier','0')==='1';
+function majClavier(){
+  $('clavier').style.display=modeClavier?'block':'none';$('dictee').style.display=modeClavier?'none':'block';
+  $('micro').style.display=modeClavier?'none':'flex';$('modeClavier').style.background=modeClavier?'var(--accent)':'';
+}
+$('modeClavier').onclick=()=>{modeClavier=!modeClavier;stock.set('smpc_clavier',modeClavier?'1':'0');if(ecoute)arreter();majClavier();if(modeClavier)$('clavier').focus()};
+$('clavier').oninput=()=>{texteFinal=$('clavier').value;$('envoyer').disabled=!texteFinal.trim()||envoiEnCours};
+majClavier();
+
 function arreter(){ecoute=false;if(rec){try{rec.onend=null;rec.stop()}catch(x){}}
   if(provisoire){texteFinal=fusion(texteFinal,provisoire);provisoire=''}
   afficher();majBouton()}
 $('micro').onclick=()=>{if(envoiEnCours)return;ecoute?arreter():demarrer()};
-$('effacer').onclick=()=>{texteFinal='';provisoire='';afficher();majBouton()};
+$('effacer').onclick=()=>{$('clavier').value='';texteFinal='';provisoire='';afficher();majBouton()};
 $('envoyer').onclick=()=>{arreter();envoyer()};
 
 /* ---- Échange avec Claude ---- */
@@ -160,11 +184,11 @@ async function envoyer(){
     if(j.ok){
       historique.push({role:'brieg',texte},{role:'claude',texte:j.texte});
       try{sessionStorage.setItem('smpc_hist',JSON.stringify(historique.slice(-24)))}catch(e){}
-      texteFinal='';
+      texteFinal='';$('clavier').value='';
       rafraichirWebapp();
     }
     envoiEnCours=false;majBouton();afficher();
-    parler(j.texte,()=>{if(j.ok&&$('mainsLibres').checked)demarrer()});
+    parler(j.texte,()=>{if(j.ok&&$('mainsLibres').checked&&!modeClavier&&!document.hidden)demarrer()});
   }catch(e){
     envoiEnCours=false;majBouton();afficher();
     message('✗ Pas de réponse ('+e.message+'). La dictée est gardée : renvoie.',true);

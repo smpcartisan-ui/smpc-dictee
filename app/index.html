@@ -212,11 +212,17 @@
   };
   var FRAIS = {};   // clé → heure de la dernière réponse du serveur (cette session)
   window.HORS_LIGNE = false;
-  function etat(hors){
-    window.HORS_LIGNE = hors;
+  /* état de la liaison : false = à jour ; 'hors' = pas de réseau ; sinon texte de l'erreur du serveur.
+     Dans les deux derniers cas, ce qui s'affiche vient de la mémoire du téléphone : on le dit. */
+  var ERRVUE='';
+  function etat(e){
+    window.HORS_LIGNE = !!e;
     var m=document.getElementById('maj'); if(!m)return;
-    var t=m.querySelector('.hors'); if(hors&&!t){t=document.createElement('span');t.className='hors';t.textContent='hors ligne';m.prepend(t,' ');}
-    if(!hors&&t)t.remove();
+    var t=m.querySelector('.hors');
+    if(!e){ if(t)t.remove(); return; }
+    if(!t){t=document.createElement('span');t.className='hors';m.prepend(t,' ');}
+    t.textContent = e==='hors' ? 'hors ligne' : '⚠ ancien affichage';
+    if(e!=='hors' && e!==ERRVUE){ ERRVUE=e; try{toast('Serveur : '+e);}catch(x){} }
   }
   function appeler(fn,args,ok,ko){
     var cle='smpc_c_'+fn+JSON.stringify(args), maintenant=Date.now();
@@ -239,7 +245,7 @@
       .catch(function(e){
         clearTimeout(minut);
         var hors = !e || e.name==='AbortError' || e.name==='TypeError';
-        if(hors) etat(true);
+        etat(hors ? 'hors' : (e.name==='SyntaxError' ? 'réponse illisible (accès du déploiement ?)' : (e.message||String(e))));
         var msg = hors ? 'Pas de réseau : données du dernier passage.'
           : e.name==='SyntaxError' ? 'Réponse illisible de la webapp (adresse ou accès du déploiement ?)' : (e.message||String(e));
         ko&&ko({message: msg});

@@ -146,6 +146,15 @@
   /* 05/11/2026 : action à faire + liens prêts */
   .alc .alk{display:inline-block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:999px;padding:2px 9px;background:var(--orange);color:var(--orangeT)}
   .alc .alp{font-weight:600;line-height:1.4}
+  .ald{margin:6px 0}
+  .ald summary{cursor:pointer;font-weight:700;color:var(--acc);padding:6px 0}
+  .algt{font-weight:700;font-size:14px;margin:10px 0 4px}
+  .alsc{overflow-x:auto;margin:0 -12px;padding:0 12px}
+  table.alt2{border-collapse:collapse;width:100%;font-size:13px}
+  table.alt2 th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);padding:4px 6px;border-bottom:2px solid var(--line);white-space:nowrap}
+  table.alt2 td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.alt2 td{white-space:nowrap} table.alt2 td:last-child{white-space:normal;min-width:140px}
+  table.alt2 td.aln{color:var(--mute);font-variant-numeric:tabular-nums}
   .all{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
   .all a.act{flex:1;text-align:center;text-decoration:none;min-width:130px;font:inherit;font-weight:700;border-radius:10px;border:1px solid var(--line);padding:10px 14px;background:var(--card);color:var(--ink)}
   .all a.act.prim{background:var(--acc);border-color:var(--acc);color:#fff}
@@ -322,6 +331,8 @@ function recevoirAlertes(a){
         (x.texte?'<div class="alx">« '+esc(x.texte)+' »</div>':'')+
         (x.motcle?'<div class="alk">'+esc(x.motcle)+'</div>':'')+
         '<div class="alp">'+esc(x.probleme)+'</div>'+
+        (x.tableau?alTableau(x,i):'')+
+        (x.vers?'<div class="all"><button class="act prim" onclick="aller('+x.vers+')">'+esc(x.versLib||'Ouvrir')+'</button></div>':'')+
         ((x.pdf||x.corr)?'<div class="all">'+
           (x.pdf?'<a class="act" href="'+esc(x.pdf)+'" target="_blank" rel="noopener">📄 Document</a>':'')+
           (x.corr?'<a class="act prim" href="'+esc(x.corr)+'" target="'+(/script\.google\.com/.test(x.corr)?'_top':'_blank')+'" rel="noopener">✏️ '+esc(x.corrLib||'Corriger')+'</a>':'')+
@@ -330,6 +341,20 @@ function recevoirAlertes(a){
         '<div class="alr2"><button class="act prim" onclick="alRepondre('+i+')">Répondre</button>'+
         (x.source!=='dispatch'&&x.source!=='controle'?'<button class="act" id="ok'+i+'" onclick="alRegler('+i+')">Réglé</button>':'')+'</div></div>';
     }).join('');
+}
+/* 05/11/2026 : carte dépliable, tableau des lignes concernées (cartes Contrôle) */
+function alTableau(x,i){
+  var T=x.tableau,n=0;T.groupes.forEach(function(g){n+=g.lignes.length;});
+  var h='<details class="ald"'+(ALOUV[x.cle]?' open':'')+' ontoggle="ALOUV[\''+esc(x.cle)+'\']=this.open"><summary>Voir '+
+    (T.groupes.length>1?'les '+T.groupes.length+' factures':n>1?'les '+n+' lignes':'la ligne')+'</summary>';
+  T.groupes.forEach(function(g){
+    if(g.titre)h+='<div class="algt">'+esc(g.titre)+'</div>';
+    h+='<div class="alsc"><table class="alt2"><tr>'+T.cols.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr>'+
+      g.lignes.map(function(l){return '<tr>'+l.map(function(c,k){
+        return '<td'+(k===0?' class="aln"':'')+'>'+(k===l.length-1&&c&&T.cols[k]===''?'<span class="chip c-o">'+esc(c)+'</span>':esc(c))+'</td>';}).join('')+'</tr>';}).join('')+
+      '</table></div>';
+  });
+  return h+'</details>';
 }
 function alEcouter(i){
   var x=AL[i],z=document.getElementById('au'+i); if(!x||!z)return;

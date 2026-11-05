@@ -2,7 +2,7 @@
    La page et ses icônes sont servies depuis le téléphone (ouverture immédiate, même sans réseau),
    puis relues en arrière-plan : une nouvelle version s'affiche au lancement suivant.
    Les appels à la webapp Google ne passent jamais par ce cache (les données sont gardées par la page). */
-var VERSION = 'c6c385025b';
+var VERSION = '83c1a78126';
 var CACHE = 'smpc-app-' + VERSION;
 var FICHIERS = ['./', 'index.html', 'manifest.json', 'icone-192.png', 'icone-512.png'];
 self.addEventListener('install', function (e) {
